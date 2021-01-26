@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using App.Metrics;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using MonitoringApi_Demo.AppMetrics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,22 +22,26 @@ namespace MonitoringApi_Demo.Controllers
         };
 
         private readonly ILogger<PessoaController> _logger;
+        private readonly IMetrics _metrics;
 
-        public PessoaController(ILogger<PessoaController> logger)
+        public PessoaController(ILogger<PessoaController> logger, 
+            IMetrics metrics)
         {
             _logger = logger;
+            _metrics = metrics;
         }
 
         [HttpGet]
         public async Task<IActionResult> Get()
         {
-            return Ok(await Task.FromResult(_pessoas));
+            return Ok(await Task.FromResult(GetPessoas()));
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(int id)
         {
-            var pessoa = await Task.FromResult(_pessoas.FirstOrDefault(p => p.Id == id));
+            //var pessoa = await Task.FromResult(_pessoas.FirstOrDefault(p => p.Id == id));
+            var pessoa = GetPessoa(id);
 
             if (pessoa == null) return NotFound();
 
@@ -45,11 +51,33 @@ namespace MonitoringApi_Demo.Controllers
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] Pessoa  pessoa)
         {
-            var pes = await Task.FromResult(_pessoas.FirstOrDefault(p => p.Id == pessoa.Id));
+            //var pes = await Task.FromResult(_pessoas.FirstOrDefault(p => p.Id == pessoa.Id));
+            var pes = GetPessoa(pessoa.Id);
 
-            if (pes == null) return NotFound();
+            if (pes != null) return BadRequest();
 
-            return Ok(pessoa);
+            AddPessoa(pessoa);
+
+            return Ok();
+        }
+
+        private Pessoa GetPessoa(int id)
+        {
+            _metrics.Measure.Counter.Increment(MetricsRegistry.QuantidadeConexoesDBCriadas);
+            return _pessoas.FirstOrDefault(p => p.Id == id);
+        }
+
+        private List<Pessoa> GetPessoas()
+        {
+            _metrics.Measure.Counter.Increment(MetricsRegistry.QuantidadeConexoesDBCriadas);
+            return _pessoas;
+        }
+
+        private void AddPessoa(Pessoa pessoa)
+        {
+            _metrics.Measure.Counter.Increment(MetricsRegistry.QuantidadeConexoesDBCriadas);
+            _pessoas.Add(pessoa);
+            _metrics.Measure.Counter.Increment(MetricsRegistry.QuantidadePessoasCriadas);
         }
     }
 }
